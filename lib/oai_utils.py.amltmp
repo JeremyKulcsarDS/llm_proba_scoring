@@ -1,0 +1,79 @@
+from typing import List, Dict
+import openai
+
+
+def call_gpt(model_name: str, prompt: str) -> str:
+    """
+    Generate a response using an OpenAI GPT model.
+
+    Args:
+        model_name (str): The name of the GPT model to use.
+        prompt (str): The prompt for generating the response.
+
+    Returns:
+        str: The generated response.
+    """
+    # Define the prompt (value of the key "content")
+    message_text = [{"role":"system","content":prompt}]
+
+    # Call the OpenAI API to generate an answer to the prompt in message_text
+    completion = openai.ChatCompletion.create(
+    engine=model_name,
+    messages = message_text,
+    temperature=0.7,
+    max_tokens=800,
+    top_p=0.95,
+    frequency_penalty=0,
+    presence_penalty=0,
+    stop=None
+    )
+
+    return completion.choices[0]["message"]["content"]
+
+
+def prompt_checking(num_tests: int, model_name: str, prompt: str, feature_prompt: dict, PromptBuilder) -> list:
+    """
+    Perform prompt checking for a specified number of tests.
+
+    Args:
+        num_tests (int): The number of tests to perform.
+        model_name (str): The name of the model to use for GPT calls.
+        prompt (str): The prompt to use for the initial GPT call.
+        feature_prompt (dict): A dictionary containing the feature prompt details.
+            It should include the following keys:
+                - "task": The task description.
+                - "header": The header text.
+                - "content": The content to be added.
+                - "return": The description of what to return.
+                - "examples": The example of output to follow.
+        PromptBuilder (class): The PromptBuilder class to use for constructing prompts.
+
+    Returns:
+        list: A list of results obtained from the prompt checking, converted to integers.
+
+    """
+    list_results = []
+    for i in range(num_tests):
+        response = call_gpt(model_name=model_name, prompt=prompt)
+        print(response)
+
+        builder = PromptBuilder()
+
+        # Construct the checker prompt
+        checker_prompt = builder.add_task(feature_prompt["task"]) \
+            .add_header(feature_prompt["header"]) \
+            .add_content(feature_prompt["content"]) \
+            .add_content_to_analyse(response) \
+            .add_what_to_return(feature_prompt["return"]) \
+            .add_output_example(feature_prompt["examples"]) \
+            .build()
+
+        print(checker_prompt)
+
+        # Perform GPT call with the checker prompt
+        result = call_gpt(model_name=model_name, prompt=checker_prompt)
+
+        # Convert the result to an integer and append to the list
+        list_results.append(int(result))
+
+    return list_results
