@@ -14,6 +14,20 @@ def parse_config_file(file_path: str) -> dict:
     Raises:
         FileNotFoundError: If the specified file does not exist.
         json.JSONDecodeError: If the file content is not valid JSON.
+
+    Config File Format:
+        The configuration file should be in JSON format and include the following keys:
+
+        For config.json file:
+            - "key_vault_name": Name of the key vault.
+            - "managed_identity_client_id": Client ID of the managed identity.
+            - "secret_key": Secret key for accessing the API.
+            - "api_type": Type of the API.
+            - "api_base": Base URL of the API.
+            - "api_version": Version of the API.
+
+        For model.json file:
+            - "gpt_model": GPT model information.
     """
     try:
         # Read the contents of the config.js file

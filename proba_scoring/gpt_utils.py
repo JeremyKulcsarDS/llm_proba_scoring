@@ -1,38 +1,52 @@
-import json
-from typing import List, Dict
-
+from typing import List, Dict, Callable
 import openai
 
+import re
 
-def parse_config_file(file_path: str) -> dict:
+
+def find_first_integer_digit(string):
+    match = re.search(r'\d+', string)
+    if match:
+        integer = int(match.group())
+        first_digit = int(str(integer)[0])
+        return first_digit
+    else:
+        return None
+
+
+class PromptBuilder:
     """
-    Parse a configuration file in JSON format.
-
-    Args:
-        file_path (str): The path to the configuration file.
-
-    Returns:
-        dict: A dictionary containing the parsed configuration.
-
-    Raises:
-        FileNotFoundError: If the specified file does not exist.
-        json.JSONDecodeError: If the file content is not valid JSON.
+    Utility class for building prompts for prompt checking.
     """
-    try:
-        # Read the contents of the config.js file
-        with open(file_path, 'r') as file:
-            content = file.read()
+    def __init__(self):
+        self.prompt = ""
 
-        # Parse the content from JSON to dict
-        config = json.loads(content)
+    def add_task(self, task_description):
+        self.prompt += f"### Task\n{task_description}\n\n"
+        return self
 
-        return config
+    def add_header(self, header_text):
+        self.prompt += f"### {header_text}\n"
+        return self
 
-    except FileNotFoundError:
-        raise FileNotFoundError(f"File not found: {file_path}")
+    def add_content(self, content):
+        self.prompt += f"{content}\n\n"
+        return self
 
-    except json.JSONDecodeError as e:
-        raise json.JSONDecodeError(f"Failed to parse JSON: {e}", e.doc, e.pos)
+    def add_content_to_analyse(self, response):
+        self.prompt += f"### Content to analyze\n```\n{response}\n```\n\n"
+        return self
+
+    def add_what_to_return(self, what_to_return):
+        self.prompt += f"### What to return\n{what_to_return}\n\n"
+        return self
+
+    def add_output_example(self, output_example):
+        self.prompt += f"### Example of output to follow\n{output_example}"
+        return self
+        
+    def build(self):
+        return self.prompt
 
 
 def call_gpt(model_name: str, prompt: str) -> str:
@@ -64,13 +78,13 @@ def call_gpt(model_name: str, prompt: str) -> str:
     return completion.choices[0]["message"]["content"]
 
 
-def prompt_checking(num_tests: int, model_name: str, prompt: str, feature_prompt: dict, PromptBuilder) -> list:
+def prompt_checking(num_tests: int, func: Callable, prompt: str, feature_prompt: dict, PromptBuilder: PromptBuilder, **kwargs) -> list:
     """
     Perform prompt checking for a specified number of tests.
 
     Args:
         num_tests (int): The number of tests to perform.
-        model_name (str): The name of the model to use for GPT calls.
+        func (function): The function taking the user query as input and returning the final response.
         prompt (str): The prompt to use for the initial GPT call.
         feature_prompt (dict): A dictionary containing the feature prompt details.
             It should include the following keys:
@@ -87,8 +101,7 @@ def prompt_checking(num_tests: int, model_name: str, prompt: str, feature_prompt
     """
     list_results = []
     for i in range(num_tests):
-        response = call_gpt(model_name=model_name, prompt=prompt)
-        print(response)
+        response = func(prompt=prompt, **kwargs)
 
         builder = PromptBuilder()
 
@@ -101,12 +114,10 @@ def prompt_checking(num_tests: int, model_name: str, prompt: str, feature_prompt
             .add_output_example(feature_prompt["examples"]) \
             .build()
 
-        print(checker_prompt)
-
         # Perform GPT call with the checker prompt
-        result = call_gpt(model_name=model_name, prompt=checker_prompt)
+        result = func(prompt=checker_prompt, **kwargs)
 
         # Convert the result to an integer and append to the list
-        list_results.append(int(result))
+        list_results.append(int(find_first_integer_digit(result)))
 
     return list_results
