@@ -28,6 +28,10 @@ def parse_config_file(file_path: str) -> dict:
 
         For model.json file:
             - "gpt_model": GPT model information.
+
+    Example:
+        >>> parse_config_file("model.json")
+        {'gpt_model': model_name}
     """
     try:
         # Read the contents of the config.js file
