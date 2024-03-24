@@ -41,6 +41,30 @@ def find_first_integer_digit(string: str) -> int:
         return None
 
 
+def find_first_float_digit(string: str) -> int:
+    """
+    Finds the first integer or decimal digit in a string. Used for double-checking the output of the checker-LLM.
+
+    Args:
+        string (str): The input string.
+
+    Returns:
+        float: The first integer or decimal digit found in the string. Returns None if no integer or decimal digit is found.
+
+    Example:
+        >>> find_first_integer_digit("abc123def456")
+        1
+        >>> find_first_integer_digit("abc0.5def789")
+        0.5
+    """
+    match = re.search(r'(\d+(\.\d+)?)', string)
+
+    if match:
+        return float(match.group())
+    else:
+        return None
+
+
 def call_gpt(model_name: str, prompt: str) -> str:
     """
     Generate a response using an OpenAI GPT model.
@@ -80,7 +104,8 @@ def build_checker_prompt(
         prompt: str, 
         response:str, 
         checker_prompt_features: dict,
-        need_initial_prompt:bool, 
+        need_initial_prompt:bool,
+        need_expected_answer:bool, # to add
         prefix_suffix_dict: dict = PROMPT_BUILDER_PREFIX_SUFFIX
         ):
 
@@ -129,7 +154,6 @@ def build_checker_prompt(
                 )
     
     return builder.build()
-
 
 
 def llm_checking(
@@ -181,8 +205,70 @@ def llm_checking(
         # Perform GPT call with the checker prompt
         result = func_checker(prompt=checker_prompt, **kwargs)
 
+        print(response,'score: ',int(find_first_integer_digit(result)))
+
         # Convert the result to an integer and append to the list
         list_results.append(int(find_first_integer_digit(result)))
+
+        # If it doesn't return 0 or 1, it will throw an error. Need to take care of this case.
+
+    return list_results
+
+
+def llm_checking_expectancy_tmp(
+        num_tests: int,
+        func_call: Callable, 
+        func_checker: Callable, 
+        prompt: str,
+        need_initial_prompt: bool,
+        expected_answer: str,
+        checker_prompt_features: CheckerPrompt = None,
+        **kwargs
+        ) -> list:
+    """
+    WORK IN PROGRESS
+    """
+    list_results = []
+    for i in range(num_tests):
+        response = func_call(prompt=prompt, **kwargs)
+
+        # Construct the checker prompt
+        checker_prompt = f"""
+        ### Task
+        Your job is to measure whether the two following statements included in the ``` contain the same information with accuracy
+        
+        ### Expected answer
+        ```
+        {expected_answer}
+        ```
+        
+        ### Generated answer
+        ```
+        {response}
+        ```
+        
+        ### What to return
+        Return an integer respecting the following rule:
+        '1' if they contain the same information,
+        '0.5' if they partially share information.
+        '0' if they share no information or the given information is different (for instance different numbers).
+        
+        Do not include anything else other than the integer in the response.
+        
+        ### Example of output to follow
+        1
+        """
+        
+        print(expected_answer)
+        print(response)
+
+        # Perform GPT call with the checker prompt
+        result = func_checker(prompt=checker_prompt, **kwargs)
+
+        print(response,'score: ',float(find_first_float_digit(result)))
+
+        # Convert the result to an integer and append to the list
+        list_results.append(float(find_first_float_digit(result)))
 
         # If it doesn't return 0 or 1, it will throw an error. Need to take care of this case.
 
