@@ -2,6 +2,9 @@ from typing import List, Dict, Callable
 
 import copy
 
+import gzip
+import numpy as np
+
 from proba_scoring.schema import CheckerPrompt
 from proba_scoring.scoring import compute_proportion_positivies, compute_conditional_proba_score, compute_unconditional_proba_score, append_proba_scores
 from proba_scoring.gpt_utils import llm_checking, llm_checking_expectancy_tmp
@@ -244,6 +247,78 @@ class ExpectancyTester():
 
         return queries_dict_copy
     
+
+class ConsistencyTester():
+    """
+    Consistency tester.
+
+    Sends an additional requests to a LLM, asking the model to judge whether 
+    the response answers the question consistently.
+    
+    This score can help gauge if the LLM is able to understand the question and 
+    provide a consistent answer.
+
+    Note: This test isn't that useful for deterministic-aimed configurations
+    such as temperature = 0 + top_k = 1.
+    """
+    def __init__(
+              self
+              ):
+        pass
+
+
+    def compute_ncd(self, str1: str, str2: str) -> float:
+        """
+        Computes the Normalized Compression Distance (NCD) between two strings.
+
+        Args:
+            str1 (str): The first string.
+            str2 (str): The second string.
+
+        Returns:
+            float: The NCD between the two strings.
+        """
+        c_str1 = len(gzip.compress(str1.encode()))
+        c_str2 = len(gzip.compress(str2.encode()))
+        c_str1_str2 = len(gzip.compress(" ".join([str1, str2]).encode()))
+        return (c_str1_str2 - min(c_str1, c_str2)) / max(c_str1, c_str2)
+    
+
+    def build_baseline(self, list_replies: List[str]) -> float:
+        """
+        Builds the baseline value by computing the NCD for each reply against itself and returning the minimum value.
+
+        Args:
+            list_replies (List[str]): A list of replies.
+
+        Returns:
+            float: The baseline value.
+        """
+        baseline_elements = []
+        for reply in list_replies:
+            baseline_elements.append(self.compute_ncd(reply, reply))
+        return min(baseline_elements)
+    
+
+    def score(self, list_replies: List[str]) -> float:
+        """
+        Computes the score based on the NCD values between pairs of replies, normalized by the baseline value.
+
+        Args:
+            list_replies (List[str]): A list of replies.
+
+        Returns:
+            float: The score.
+        """
+        baseline = self.build_baseline(list_replies)
+
+        ncd_list = []
+        for i in range(len(list_replies)):
+            for j in range(i + 1, len(list_replies)):
+                ncd_list.append(self.compute_ncd(list_replies[i], list_replies[j]) - baseline)
+
+        return 1 - np.mean(ncd_list)
+
 
 class ToxicityTester():
     """

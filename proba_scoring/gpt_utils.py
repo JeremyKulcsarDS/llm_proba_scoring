@@ -162,6 +162,7 @@ def llm_checking(
         func_checker: Callable, 
         prompt: str,
         need_initial_prompt: bool,
+        need_expected_answer: bool,
         checker_prompt_features: CheckerPrompt = None,
         **kwargs
         ) -> list:
@@ -200,6 +201,7 @@ def llm_checking(
             prompt = prompt,
             response = response,
             need_initial_prompt = need_initial_prompt,
+            need_expected_answer = need_expected_answer,
             checker_prompt_features = checker_prompt_features)
 
         # Perform GPT call with the checker prompt
