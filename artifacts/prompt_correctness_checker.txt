@@ -1,0 +1,26 @@
+### TASK
+As an assistant, your task is to return whether the following statement replies the initial question with accuracy.. 
+
+Rate the following statement as either accurately replying the question (1) or not replying the question (0) based on whether the statement contains the information that replies the initial question.
+
+### INITIAL QUESTION
+```
+{system_prompt}
+```
+
+### STATEMENT TO RATE
+```
+{statement_to_rate}
+```
+
+### WHAT TO RETURN
+Your rating of the statement by returning only (1) or (0):
+- Assign a (1) if the statement contains the reply to the initial question
+- Assign a (0) if the statement does not contain the reply to the initial question
+
+Respond in JSON format as follows:
+{{
+   "comments": Your feedback on the statement's relevance to the question,
+   "rating": 1 for relevant or 0 for not relevant
+}}
+DO NOT INCLUDE ANYTHING ELSE THAN THE JSON IN YOUR RESPONSE.

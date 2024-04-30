@@ -4,17 +4,7 @@ from proba_scoring.prompt_builder import PromptBuilder
 from proba_scoring.schema import CheckerPrompt
 
 import re
-
-PROMPT_BUILDER_PREFIX_SUFFIX = {
-        "task": ["### Task\n","\n\n"],
-        "header": ["### ","\n"],
-        "content": ["","\n\n"],
-        "initial_prompt": ["### Initial prompt\n```\n","\n```\n\n"],
-        "response": ["### Response\n```\n","\n```\n\n"],
-        "content_to_analyse": ["### Content to analyse\n```\n","\n```\n\n"],
-        "to_return": ["### What to return\n","\n\n"],
-        "example": ["### Example of output to follow\n",""]
-    }
+import json
 
 
 def find_first_integer_digit(string: str) -> int:
@@ -99,71 +89,13 @@ def call_gpt(model_name: str, prompt: str) -> str:
     return completion.choices[0]["message"]["content"]
 
 
-def build_checker_prompt(
-        builder: PromptBuilder, 
-        prompt: str, 
-        response:str, 
-        checker_prompt_features: dict,
-        need_initial_prompt:bool,
-        need_expected_answer:bool, # to add
-        prefix_suffix_dict: dict = PROMPT_BUILDER_PREFIX_SUFFIX
-        ):
-
-    if need_initial_prompt:
-        for key in checker_prompt_features.keys():
-            if key != "to_return":
-                builder.add_line(
-                    prefix_suffix_dict[key][0],
-                    checker_prompt_features[key],
-                    prefix_suffix_dict[key][1]
-                )
-            else:
-                builder.add_line(
-                    prefix_suffix_dict["initial_prompt"][0],
-                    prompt,
-                    prefix_suffix_dict["initial_prompt"][1]
-                )
-                builder.add_line(
-                    prefix_suffix_dict["response"][0],
-                    response,
-                    prefix_suffix_dict["response"][1]
-                )
-                builder.add_line(
-                    prefix_suffix_dict[key][0],
-                    checker_prompt_features[key],
-                    prefix_suffix_dict[key][1]
-                )
-    else:
-        for key in checker_prompt_features.keys():
-            if key != "to_return":
-                builder.add_line(
-                    prefix_suffix_dict[key][0],
-                    checker_prompt_features[key],
-                    prefix_suffix_dict[key][1]
-                )
-            else:
-                builder.add_line(
-                    prefix_suffix_dict["content_to_analyse"][0],
-                    response,
-                    prefix_suffix_dict["content_to_analyse"][1]
-                )
-                builder.add_line(
-                    prefix_suffix_dict[key][0],
-                    checker_prompt_features[key],
-                    prefix_suffix_dict[key][1]
-                )
-    
-    return builder.build()
-
-
 def llm_checking(
         num_tests: int,
         func_call: Callable, 
         func_checker: Callable, 
         prompt: str,
-        need_initial_prompt: bool,
-        need_expected_answer: bool,
-        checker_prompt_features: CheckerPrompt = None,
+        system_prompt: str = None,
+        checker_prompt: str = None,
         **kwargs
         ) -> list:
     """
@@ -174,13 +106,8 @@ def llm_checking(
         func_call (function): The function taking the user query as input (can be a simple GPT API call or a whole pipeline).
         func_checker (function): The function taking the first user response as input and returning the final response (can be a simple GPT API call or a whole pipeline).
         prompt (str): The prompt to use for the initial LLM call.
-        feature_prompt (dict): A dictionary containing the feature prompt details for the checker LLM.
-            It should include the following keys:
-                - "task": The task description.
-                - "header": The header text.
-                - "content": The content to be added.
-                - "to_return": The description of what to return (should always return 0 or 1).
-                - "examples": The example of output to follow.
+        system_prompt (str): Either the question to compare, the expected answer, or anything that the checker prompt will compare to the intiial prompt 
+        checker_prompt (str): The checker prompt
         **kwargs: Additional keyword arguments for the model API. (e.g., `max_tokens`, `temperature`)
 
     Returns:
@@ -194,84 +121,15 @@ def llm_checking(
     for i in range(num_tests):
         response = func_call(prompt=prompt, **kwargs)
 
-        # Construct the checker prompt
-        builder = PromptBuilder()
-        checker_prompt = build_checker_prompt(
-            builder = builder,
-            prompt = prompt,
-            response = response,
-            need_initial_prompt = need_initial_prompt,
-            need_expected_answer = need_expected_answer,
-            checker_prompt_features = checker_prompt_features)
-
         # Perform GPT call with the checker prompt
-        result = func_checker(prompt=checker_prompt, **kwargs)
+        if system_prompt is not None:
+            result = func_checker(prompt=checker_prompt.format(system_prompt=system_prompt, statement_to_rate=response), **kwargs)
+        else:
+            result = func_checker(prompt=checker_prompt.format(statement_to_rate=response), **kwargs)
 
-        print(response,'score: ',int(find_first_integer_digit(result)))
+        print(response,'score: ',int(json.loads(result)['rating']))
 
         # Convert the result to an integer and append to the list
-        list_results.append(int(find_first_integer_digit(result)))
-
-        # If it doesn't return 0 or 1, it will throw an error. Need to take care of this case.
-
-    return list_results
-
-
-def llm_checking_expectancy_tmp(
-        num_tests: int,
-        func_call: Callable, 
-        func_checker: Callable, 
-        prompt: str,
-        need_initial_prompt: bool,
-        expected_answer: str,
-        checker_prompt_features: CheckerPrompt = None,
-        **kwargs
-        ) -> list:
-    """
-    WORK IN PROGRESS
-    """
-    list_results = []
-    for i in range(num_tests):
-        response = func_call(prompt=prompt, **kwargs)
-
-        # Construct the checker prompt
-        checker_prompt = f"""
-        ### Task
-        Your job is to measure whether the two following statements included in the ``` contain the same information with accuracy
-        
-        ### Expected answer
-        ```
-        {expected_answer}
-        ```
-        
-        ### Generated answer
-        ```
-        {response}
-        ```
-        
-        ### What to return
-        Return an integer respecting the following rule:
-        '1' if they contain the same information,
-        '0.5' if they partially share information.
-        '0' if they share no information or the given information is different (for instance different numbers).
-        
-        Do not include anything else other than the integer in the response.
-        
-        ### Example of output to follow
-        1
-        """
-        
-        print(expected_answer)
-        print(response)
-
-        # Perform GPT call with the checker prompt
-        result = func_checker(prompt=checker_prompt, **kwargs)
-
-        print(response,'score: ',float(find_first_float_digit(result)))
-
-        # Convert the result to an integer and append to the list
-        list_results.append(float(find_first_float_digit(result)))
-
-        # If it doesn't return 0 or 1, it will throw an error. Need to take care of this case.
+        list_results.append(int(json.loads(result)['rating']))
 
     return list_results

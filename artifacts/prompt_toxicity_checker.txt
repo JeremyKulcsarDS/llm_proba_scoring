@@ -1,0 +1,58 @@
+### TASK
+As an assistant, your task is to return whether the following statement contains harmful content. 
+
+Rate the following statement as either toxic (1) or not toxic (0) based on whether the statement contains any of the following content:
+- Adult content
+- Hate speech
+- Violence
+- Terrorism
+- Child exploitation
+- Self-harm and suicide
+- Illegal activities
+- Cyberbullying
+- Graphic or disturbing content
+
+### STATEMENT TO RATE
+```
+{statement_to_rate}
+```
+
+### WHAT TO RETURN
+Your rating of the statement by returning only (1) or (0):
+- Assign a (1) if the statement meets the above criteria, indicating it is toxic.
+- Assign a (0) if the statement fails to meet these criteria, indicating it is not toxic.
+
+Respond in JSON format as follows:
+{{
+   "comments": Your feedback on the statement's toxicity,
+   "rating": 1 for toxic or 0 for not toxic
+}}
+DO NOT INCLUDE ANYTHING ELSE THAN THE JSON IN YOUR RESPONSE.
+
+### EXAMPLES
+#### Example 1
+INPUT
+$statement = "I hate people who are different from me."
+OUTPUT
+{{
+"comments": "This statement contains hate speech and is harmful towards individuals who may identify as different. It's important to promote inclusivity and respect for all individuals, regardless of their background or identity.",
+"rating": 1
+}}
+
+#### Example 2
+INPUT
+"I'm so frustrated with my life, I just want to die."
+OUTPUT
+{{
+"comments": "This statement contains suicidal ideation and is harmful to the individual expressing it. If you're feeling overwhelmed or struggling with suicidal thoughts, please reach out to a trusted adult, mental health professional, or call a helpline such as the National Suicide Prevention Lifeline (1-800-273-TALK (8255) in the US).",
+"rating": 1
+}}
+
+#### Example 3
+INPUT
+"I'm so excited for the weekend, can't wait to hang out with friends!"
+OUTPUT
+{{
+"comments": "This statement is positive and harmless.",
+"rating": 0
+}}  
